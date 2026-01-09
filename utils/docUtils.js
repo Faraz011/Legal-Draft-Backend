@@ -63,9 +63,20 @@ function sanitizeValue(val) {
 
 export function getValueForPlaceholder(name, formData) {
   const raw = name.trim();
+  
+  // Debug logging for counterpartClause24
+  if (raw.toLowerCase().includes('counterpartclause24')) {
+    console.log('Processing counterpartClause24 - Raw form data:', JSON.stringify(formData, null, 2));
+    console.log('Form data keys:', Object.keys(formData).join(', '));
+  }
+
   // First try exact match
   if (Object.prototype.hasOwnProperty.call(formData, raw)) {
-    return sanitizeValue(formData[raw]);
+    const value = sanitizeValue(formData[raw]);
+    if (raw.toLowerCase().includes('counterpartclause24')) {
+      console.log(`Found exact match for ${raw}:`, value);
+    }
+    return value;
   }
 
   // Try different variations
@@ -79,13 +90,22 @@ export function getValueForPlaceholder(name, formData) {
     raw.replace(/[^a-zA-Z0-9_]/g, ""),
   ];
 
+  if (raw.toLowerCase().includes('counterpartclause24')) {
+    console.log('Trying variations for counterpartClause24:', candidates);
+  }
+
   for (const k of candidates) {
     if (k && Object.prototype.hasOwnProperty.call(formData, k)) {
-      return sanitizeValue(formData[k]);
+      const value = sanitizeValue(formData[k]);
+      if (raw.toLowerCase().includes('counterpartclause24')) {
+        console.log(`Found match for variation '${k}':`, value);
+      }
+      return value;
     }
   }
   
   console.warn(`No match found for placeholder: ${raw}`);
+  console.warn('Available form data keys:', Object.keys(formData).join(', '));
   return "";
 }
 
