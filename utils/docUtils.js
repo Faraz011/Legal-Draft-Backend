@@ -1,8 +1,5 @@
-import JSZip from "jszip";
-import { createReport } from "docx-templates";
-import fs from "fs";
-import path from "path";
-import DOCX2PDFConverter from "docx2pdf-converter";
+import puppeteer from "puppeteer";
+import mammoth from "mammoth";
 
 // --- merge runs containing placeholders ---
 export function mergeRunsContainingPlaceholders(xml) {
@@ -153,11 +150,45 @@ export async function generateReport(templatePath, formData, format = "docx") {
   });
 
   if (format === "pdf") {
-    const tempDocx = path.resolve("./templates/temp.docx");
-    const tempPdf = path.resolve("./templates/temp.pdf");
-    fs.writeFileSync(tempDocx, reportBuffer);
-    await DOCX2PDFConverter.convert(tempDocx, tempPdf);
-    return fs.readFileSync(tempPdf);
+    // 1) Convert DOCX buffer to HTML using mammoth
+    const { value: html } = await mammoth.convertToHtml({ buffer: Buffer.from(reportBuffer) });
+    
+    // 2) Wrap HTML with styles for printing
+    const fullHtml = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <style>
+            body { font-family: "Times New Roman", serif; font-size: 12pt; margin: 20mm; color: #111; }
+            p { margin: 0 0 8px; line-height: 1.45; }
+            table { border-collapse: collapse; width: 100%; }
+            table td, table th { border: 1px solid #ccc; padding: 6px; }
+            img { max-width: 100%; height: auto; }
+          </style>
+        </head>
+        <body>${html}</body>
+      </html>
+    `;
+
+    // 3) Use puppeteer to render HTML -> PDF
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      headless: "new"
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(fullHtml, { waitUntil: "networkidle0" });
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "18mm", bottom: "18mm", left: "15mm", right: "15mm" }
+      });
+      return Buffer.from(pdfBuffer);
+    } finally {
+      await browser.close();
+    }
   }
 
   return Buffer.from(reportBuffer);
